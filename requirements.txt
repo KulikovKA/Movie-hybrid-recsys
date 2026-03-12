@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy[asyncio]
+asyncpg
+pydantic
+pydantic-settings
+implicit
+faiss-cpu
+sentence-transformers
+openai
+python-dotenv
+pandas
+numpy
+scipy

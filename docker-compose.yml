@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # 1. База данных
+  movie_db:
+    image: postgres:16
+    container_name: movie_db
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: movie_recsys
+    ports:
+      - "5433:5432"  # Снаружи (в Windows) доступ по 5433, внутри 5432
+    volumes:
+      - movie_data:/var/lib/postgresql/data
+    networks:
+      - recsys_network
+
+  # 2. Бэкенд (FastAPI)
+  backend:
+    build: .
+    container_name: movie_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - movie_db
+    volumes:
+      - .:/app  # Чтобы код обновлялся без пересборки (режим разработки)
+    networks:
+      - recsys_network
+
+  # 3. MLflow Tracking Server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.2
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /app/artifacts
+    volumes:
+      - ./mlflow:/app
+    networks:
+      - recsys_network
+
+  # 4. Prometheus (Сборщик метрик)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - recsys_network
+
+  # 5. Grafana (Дашборды)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - recsys_network
+    depends_on:
+      - prometheus
+
+networks:
+  recsys_network:
+    driver: bridge
+
+volumes:
+  movie_data:
+  grafana_data: # <--- Новое хранилище для настроек Графаны

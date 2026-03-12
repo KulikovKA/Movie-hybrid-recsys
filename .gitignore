@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.env
+
+# Docker / База данных (НЕЛЬЗЯ заливать сырые данные БД)
+movie_data/
+grafana_data/
+
+# MLflow
+mlflow/
+mlruns/
+artifacts/
+
+# Индексы и веса (обычно они тяжелые, их хранят отдельно, но для диплома можно оставить, если они <100MB)
+# Если файлы faiss_index.bin или модели весят много — добавь их сюда
+
+# IDE
+.vscode/
+.idea/
+
+data/
+*.csv
+*.index
