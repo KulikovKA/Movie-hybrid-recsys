@@ -12,3 +12,5 @@ python-dotenv
 pandas
 numpy
 scipy
+prometheus-fastapi-instrumentator
+mlflow

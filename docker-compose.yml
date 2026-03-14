@@ -15,6 +15,12 @@ services:
       - movie_data:/var/lib/postgresql/data
     networks:
       - recsys_network
+    # Умная проверка жизнеспособности базы данных
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d movie_recsys"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # 2. Бэкенд (FastAPI)
   backend:
@@ -25,7 +31,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - movie_db
+      movie_db:
+        condition: service_healthy # Бэкенд ждет, пока база не станет "здоровой"
     volumes:
       - .:/app  # Чтобы код обновлялся без пересборки (режим разработки)
     networks:
@@ -37,9 +44,10 @@ services:
     container_name: mlflow_server
     ports:
       - "5000:5000"
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /app/artifacts
+    # Явно указываем пути внутри папки /app
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////app/mlflow.db --default-artifact-root /app/artifacts
     volumes:
-      - ./mlflow:/app
+      - ./mlflow_data:/app # Поменяли название папки на mlflow_data
     networks:
       - recsys_network
 
@@ -67,10 +75,25 @@ services:
     depends_on:
       - prometheus
 
+  # 6. Frontend (Streamlit UI)
+  frontend:
+    image: python:3.11-slim
+    container_name: movie_frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
+    command: bash -c "pip install streamlit requests && streamlit run app.py --server.port=8501 --server.address=0.0.0.0"
+    networks:
+      - recsys_network
+    depends_on:
+      - backend
+
 networks:
   recsys_network:
     driver: bridge
 
 volumes:
   movie_data:
-  grafana_data: # <--- Новое хранилище для настроек Графаны
+  grafana_data:
