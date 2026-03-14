@@ -14,3 +14,4 @@ numpy
 scipy
 prometheus-fastapi-instrumentator
 mlflow
+psycopg2-binary

@@ -72,12 +72,92 @@ async def migrate_movies(session: AsyncSession):
             # Если одна пачка битая, мы ее пропускаем и идем дальше
             continue
 
+
+async def migrate_ratings(session: AsyncSession):
+    """
+    Миграция рейтингов из CSV в PostgreSQL.
+    Для скорости используем pandas + sql alchemy (синхронный движок, так как to_sql не поддерживает асинхронность).
+    """
+    print(">>> Проверка файла ratings.csv...")
+    # При старте скрипта из корня, путь data/ratings.csv.
+    # Если запускаем из папки scripts, то ../data/ratings.csv
+    file_path = 'data/ratings.csv'
+    
+    if not os.path.exists(file_path):
+        print(f"!!! Ошибка: Файл {file_path} не найден! Пропускаем загрузку рейтингов.")
+        return
+
+    # Создаем синхронный движок для pandas
+    from sqlalchemy import create_engine
+    from src.config import settings
+
+    # Получаем URL и меняем драйвер на синхронный (postgresql+psycopg2 или просто postgresql)
+    # settings.DATABASE_URL обычно имеет вид postgresql+asyncpg://...
+    # Нам нужен postgresql://... для pandas
+    sync_db_url = settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
+    
+    # Если URL был relative/sqlite (вряд ли), это не сработает, но у нас postgres.
+    engine = create_engine(sync_db_url)
+
+    print(">>> Загрузка списка ID фильмов из базы для фильтрации...")
+    try:
+        valid_movie_ids = pd.read_sql("SELECT id FROM movies", con=engine)['id'].values
+        valid_movie_set = set(valid_movie_ids)
+        print(f"--- Найдено {len(valid_movie_set)} фильмов в базе.")
+    except Exception as e:
+        print(f"!!! Ошибка при чтении списка фильмов: {e}")
+        return
+
+    print(">>> Чтение ratings.csv с помощью pandas...")
+    # Загружаем только нужные колонки
+    chunks = pd.read_csv(file_path, usecols=['userId', 'movieId', 'rating'], chunksize=100000)
+    
+    print(">>> Начинаем вставку рейтингов (chunk by chunk)...")
+    total_loaded = 0
+    
+    for chunk in chunks:
+        # Переименовываем колонки под модель
+        chunk = chunk.rename(columns={
+            'userId': 'user_id',
+            'movieId': 'movie_id'
+        })
+
+        # Фильтруем рейтинги, оставляем только те, что относятся к существующим фильмам
+        original_len = len(chunk)
+        chunk = chunk[chunk['movie_id'].isin(valid_movie_set)]
+        filtered_len = len(chunk)
+        if original_len != filtered_len:
+            print(f"--- Отфильтровано {original_len - filtered_len} рейтингов (нет фильма в базе).")
+        
+        if chunk.empty:
+            continue
+        
+        # Вставляем данные. if_exists='append' добавит строки.
+        # index=False, чтобы не писать индекс pandas как колонку.
+        try:
+            chunk.to_sql('ratings', con=engine, if_exists='append', index=False, method='multi', chunksize=1000)
+            total_loaded += len(chunk)
+            print(f"--- Загружено рейтингов: {total_loaded}")
+        except Exception as e:
+            print(f"!!! Ошибка при загрузке чанка рейтингов: {e}")
+
 async def main():
     """ Основная функция миграции """
     print("=== ЗАПУСК МИГРАЦИИ ===")
+    
+    print("1. Создаем таблицы (если их нет)...")
+    # Импортируем создание таблиц
+    from src.database.session import engine
+    from src.database.models import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        
     async with AsyncSessionLocal() as session:
         try:
             await migrate_movies(session)
+            # Миграция рейтингов (она внутри создает свой engine)
+            await migrate_ratings(session)
+            
             print("=== МИГРАЦИЯ ЗАВЕРШЕНА УСПЕШНО ===")
         except Exception as e:
             print(f"!!! ПРОИЗОШЛА ОШИБКА: {e}")

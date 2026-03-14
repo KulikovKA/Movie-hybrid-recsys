@@ -34,5 +34,6 @@ movies: Список объектов фильмов.
 explanation: Текстовое объяснение рекомендаций от LLM.
 """
 class RecommendationResponse(BaseModel):
-    movies: List[MovieSchema]
+    recommendations: List[MovieSchema]
     explanation: str
+    user_history: List[str] = []

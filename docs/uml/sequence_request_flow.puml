@@ -1,0 +1,102 @@
+@startuml
+' Гибридная рекомендательная система — Диаграмма последовательности
+' Упрощённая версия (читабельно и информативно)
+
+title Поток запроса — Streamlit → FastAPI → Рекомендации → LLM
+hide footbox
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam dpi 220
+skinparam ParticipantPadding 26
+skinparam BoxPadding 18
+skinparam SequenceMessageAlign center
+skinparam maxMessageSize 140
+skinparam ResponseMessageBelowArrow true
+
+actor User as user
+
+box "ПК пользователя" #FFFFFF
+  participant "Streamlit\n(интерфейс)" as streamlit
+end box
+
+box "Docker" #FFFFFF
+  participant "FastAPI\n(API)" as fastapi
+  participant "RecommenderService\n(ядро)" as rec
+  participant "FAISS\n(контент)" as faiss
+  participant "ALS\n(коллаб.)" as als
+  database "PostgreSQL\n(метаданные)" as pg
+end box
+
+box "Облако" #FFFFFF
+  participant "Groq API\nLLM Llama-3" as llm
+end box
+
+== 1) Ввод запроса ==
+user -> streamlit : Ввод запроса/настроек\n(опц.: user_id, k)
+streamlit -> fastapi : POST /recommend\n{query, user_id?, k}
+activate fastapi
+
+fastapi -> rec : построить рекомендации\n(валидация + оркестрация)
+activate rec
+
+note right of fastapi
+  Пример ответа (JSON):
+  - items: список фильмов
+  - explanations: объяснения
+  - summary: краткий вывод
+end note
+
+== 2) Нормализация запроса (LLM) ==
+alt запрос задан
+  rec -> llm : Перевод + нормализация\n(ключевые слова)
+  activate llm
+  llm --> rec : нормализованный_запрос
+  deactivate llm
+else запрос пустой
+  rec -> rec : режим по профилю\n(история/рейтинги)
+end
+
+== 3) Генерация кандидатов (гибрид) ==
+par FAISS (по смыслу)
+  rec -> faiss : Векторный поиск\n(topK кандидатов)
+  activate faiss
+  faiss --> rec : кандидаты_FAISS[]
+  deactivate faiss
+else ALS (по пользователям)
+  rec -> als : Скоринг ALS\n(topK кандидатов)
+  activate als
+  als --> rec : кандидаты_ALS[]
+  deactivate als
+end
+
+rec -> rec : объединить и отсортировать\n(итоговый список кандидатов)
+
+== 4) Метаданные ==
+rec -> pg : Запрос метаданных\n(title, genres, overview, year)
+activate pg
+pg --> rec : метаданные_фильмов[]
+deactivate pg
+
+== 5) Переранжирование + объяснение (LLM) ==
+rec -> llm : Переранжировать + объяснить\n(запрос + метаданные)
+activate llm
+llm --> rec : финальный_рейтинг[]\n+ explanations[] + summary
+
+deactivate llm
+
+== 6) Ответ ==
+rec --> fastapi : JSON\n{items, explanations, summary}
+deactivate rec
+fastapi --> streamlit : 200 OK + JSON
+streamlit --> user : Показ списка\n+ объяснения
+
+deactivate fastapi
+
+== Failover ==
+alt Groq недоступен/таймаут
+  rec -> rec : fallback: без LLM\n(только гибридный рейтинг)
+end
+
+@enduml
