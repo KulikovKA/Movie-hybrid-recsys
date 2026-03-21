@@ -78,11 +78,10 @@ POSTGRES_USER=myuser
 POSTGRES_PASSWORD=mypassword
 POSTGRES_DB=movie_recsys
 GROQ_API_KEY=your_groq_key
-# OPENROUTER_API_KEY=optional
-# OPENAI_API_KEY=optional
+
 ```
 
-В текущей конфигурации проекта достаточно `GROQ_API_KEY`. Ключи OpenRouter/OpenAI необязательны.
+В текущей конфигурации проекта достаточно `GROQ_API_KEY`. 
 
 2. Убедитесь, что CSV из Kaggle лежат в data.
 
@@ -114,21 +113,4 @@ docker compose up -d --build
 - Grafana загружает дашборды из grafana/dashboards.
 - MLflow хранит параметры и метрики запросов в эксперименте Movie_Recommendations.
 
-## Локальная разработка без Docker
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn src.main:app --reload
-```
-
-## FAQ
-
-**Почему мы не пушим "контейнеры Docker" в Git?**
-
-Потому что в Git хранятся исходники и конфиги (`Dockerfile`, `docker-compose.yml`), а не сами контейнеры/образы. Контейнеры собираются локально командой `docker compose up --build`.
-
-Если нужно распространять готовый образ, его публикуют в Docker Registry (например, Docker Hub/GHCR), а не в Git-репозиторий.
-
-[^1]: Одноразовая миграция CSV в БД: `docker exec movie_backend python scripts/migrate_csv_to_sql.py`
