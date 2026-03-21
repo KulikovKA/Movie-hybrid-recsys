@@ -31,14 +31,10 @@ https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset
 Основная UML-диаграмма (единая):
 - docs/uml/system_overview.puml
 
-Рендеры диаграммы:
-- docs/uml/system_overview.svg
-- docs/uml/system_overview.pdf
+Рендер диаграммы для README:
 - docs/uml/system_overview.png
 
-![Unified System Diagram](docs/uml/system_overview.svg)
-
-Если в вашем просмотрщике PNG отображается некорректно, в README используется SVG-версия, а PDF доступен как резервный формат.
+![Unified System Diagram](docs/uml/system_overview.png)
 
 ## Основные возможности
 
@@ -60,39 +56,43 @@ https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset
 
 ## Структура проекта
 
+```text
 recsys_project/
-|- src/                          # backend API и сервисы рекомендаций
-|- scripts/                      # миграция CSV в PostgreSQL
-|- docs/uml/                     # UML-код диаграмм (PlantUML)
-|- docs/openwebui/               # интеграция Open WebUI tool/function
-|- data/                         # CSV, FAISS index, артефакты маппингов
-|- grafana/                      # provisioning и dashboards
-|- prometheus/                   # конфиг Prometheus
-|- docker-compose.yml
-|- requirements.txt
+├─ src/                          # backend API и сервисы рекомендаций
+├─ scripts/                      # миграция CSV в PostgreSQL
+├─ docs/uml/                     # UML-код диаграмм (PlantUML)
+├─ docs/openwebui/               # интеграция Open WebUI tool/function
+├─ data/                         # CSV, FAISS index, артефакты маппингов
+├─ grafana/                      # provisioning и dashboards
+├─ prometheus/                   # конфиг Prometheus
+├─ docker-compose.yml
+└─ requirements.txt
+```
 
 ## Быстрый запуск
 
 1. Подготовьте .env в корне проекта:
 
+```env
 POSTGRES_USER=myuser
 POSTGRES_PASSWORD=mypassword
 POSTGRES_DB=movie_recsys
-OPENROUTER_API_KEY=your_key_optional
-GROQ_API_KEY=your_key_optional
-OPENAI_API_KEY=your_key_optional
+GROQ_API_KEY=your_groq_key
+# OPENROUTER_API_KEY=optional
+# OPENAI_API_KEY=optional
+```
+
+В текущей конфигурации проекта достаточно `GROQ_API_KEY`. Ключи OpenRouter/OpenAI необязательны.
 
 2. Убедитесь, что CSV из Kaggle лежат в data.
 
 3. Поднимите сервисы:
 
+```bash
 docker compose up -d --build
+```
 
-4. Выполните миграцию CSV в БД (один раз):
-
-docker exec movie_backend python scripts/migrate_csv_to_sql.py
-
-5. Откройте сервисы:
+4. Откройте сервисы:
 
 - Open WebUI: http://localhost:3000
 - FastAPI docs: http://localhost:8000/docs
@@ -116,7 +116,19 @@ docker exec movie_backend python scripts/migrate_csv_to_sql.py
 
 ## Локальная разработка без Docker
 
+```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn src.main:app --reload
+```
+
+## FAQ
+
+**Почему мы не пушим "контейнеры Docker" в Git?**
+
+Потому что в Git хранятся исходники и конфиги (`Dockerfile`, `docker-compose.yml`), а не сами контейнеры/образы. Контейнеры собираются локально командой `docker compose up --build`.
+
+Если нужно распространять готовый образ, его публикуют в Docker Registry (например, Docker Hub/GHCR), а не в Git-репозиторий.
+
+[^1]: Одноразовая миграция CSV в БД: `docker exec movie_backend python scripts/migrate_csv_to_sql.py`
