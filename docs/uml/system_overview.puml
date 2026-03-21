@@ -1,0 +1,81 @@
+@startuml
+' Unified diagram optimized for small PNG rendering
+top to bottom direction
+skinparam shadowing false
+skinparam dpi 170
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam roundcorner 8
+skinparam ArrowColor #334155
+skinparam ArrowThickness 1.2
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam wrapWidth 180
+skinparam maxMessageSize 60
+skinparam rectangle {
+  BorderColor #475569
+  BackgroundColor #FFFFFF
+  FontColor #0F172A
+}
+skinparam package {
+  BorderColor #64748B
+  BackgroundColor #F8FAFC
+  FontColor #0F172A
+}
+skinparam database {
+  BorderColor #475569
+  BackgroundColor #ECFEFF
+  FontColor #0F172A
+}
+skinparam cloud {
+  BorderColor #475569
+  BackgroundColor #FFF7ED
+  FontColor #0F172A
+}
+
+title Hybrid Movie Recommendation System - Unified Diagram
+
+actor "User" as user
+
+package "Client" #EEF2FF {
+  rectangle "Open WebUI" as webui
+  rectangle "Tool Bridge" as tool
+}
+
+package "Backend (FastAPI)" #F8FAFC {
+  rectangle "API\n/recommend" as api
+  rectangle "Recommender" as rec
+  rectangle "Retrieval\nFAISS + ALS" as retrieval
+  database "PostgreSQL" as pg
+}
+
+package "Observability" #ECFDF5 {
+  rectangle "Prometheus" as prom
+  rectangle "Grafana" as graf
+  rectangle "MLflow" as mlflow
+}
+
+cloud "LLM Provider" as llm
+rectangle "Artifacts\nfaiss.index + als.pkl" as artifacts
+
+package "Flow Legend" #FFF7ED {
+  rectangle "1 User -> Open WebUI\n2 Open WebUI -> Tool\n3 Tool -> API\n4 API -> Recommender\n5 Recommender -> Retrieval\n6 Recommender -> PostgreSQL\n7 Recommender -> LLM\n8 Recommender -> API\n9 API -> Open WebUI\n10 Open WebUI -> User" as flow_legend
+}
+
+user --> webui : 1
+webui --> tool : 2
+tool --> api : 3
+api --> rec : 4
+rec --> retrieval : 5
+retrieval --> artifacts : load
+rec --> pg : 6
+rec --> llm : 7
+rec --> api : 8
+api --> webui : 9
+webui --> user : 10
+
+api --> mlflow : metrics
+api --> prom : /metrics
+graf --> prom : read
+
+@enduml

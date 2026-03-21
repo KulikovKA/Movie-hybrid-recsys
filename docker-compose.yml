@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # 1. База данных
   movie_db:
@@ -69,24 +67,24 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
     networks:
       - recsys_network
     depends_on:
       - prometheus
 
-  # 6. Frontend (Streamlit UI)
-  frontend:
-    image: python:3.11-slim
-    container_name: movie_frontend
+  # 6. Frontend (Open WebUI)
+  open_webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
     ports:
-      - "8501:8501"
+      - "3000:8080"
     volumes:
-      - ./frontend:/app
-    working_dir: /app
-    command: bash -c "pip install streamlit requests && streamlit run app.py --server.port=8501 --server.address=0.0.0.0"
+      - open_webui_data:/app/backend/data
     networks:
       - recsys_network
     depends_on:
@@ -99,3 +97,4 @@ networks:
 volumes:
   movie_data:
   grafana_data:
+  open_webui_data:

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Movie RecSys Dashboards'
+    orgId: 1
+    folder: 'Movie RecSys'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards

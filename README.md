@@ -1,102 +1,122 @@
 # Hybrid Movie Recommendation System
 
-Гибридная рекомендательная система фильмов, построенная на микросервисной архитектуре. Проект объединяет классические алгоритмы машинного обучения (ALS, FAISS) с возможностями LLM (Llama-3) для интерпретации запросов и объяснения рекомендаций.
+Гибридная рекомендательная система фильмов на основе FAISS, ALS и LLM. Проект использует FastAPI для API-слоя, Open WebUI как основной пользовательский интерфейс и стек наблюдаемости Prometheus + Grafana + MLflow.
 
-## Описание проекта
+## Что делает система
 
-Система предоставляет персонализированные рекомендации фильмов, используя гибридный подход:
-1.  **Контентная фильтрация (Content-Based):** Векторный поиск по семантике описаний фильмов через FAISS (эмбеддинги MiniLM).
-2.  **Коллаборативная фильтрация (Collaborative Filtering):** Матричная факторизация ALS для учета истории действий похожих пользователей.
-3.  **LLM-обогащение:** Использование большой языковой модели (Llama-3 через Groq API) для перевода запросов с русского языка, извлечения ключевых слов и генерации текстовых объяснений, почему именно этот фильм подходит пользователю.
+Сервис принимает пользовательский запрос и профиль пользователя, затем строит рекомендации в несколько шагов:
+1. Контентный поиск по эмбеддингам через FAISS.
+2. Коллаборативный сигнал по истории оценок через ALS.
+3. Реранжирование и объяснение рекомендаций через LLM.
 
-## Архитектура системы
+Результат: список фильмов и объяснение, почему именно эти фильмы подходят под запрос.
 
-Ниже представлена диаграмма компонентов, демонстрирующая взаимодействие сервисов, баз данных и внешних API.
+## Датасет
 
-![Component Diagram](assets/component_diagram.png)
+Источник данных:
+https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset
 
-## Логика обработки запроса
+Используемые файлы из датасета:
+- movies_metadata.csv
+- ratings.csv
+- keywords.csv
+- credits.csv
+- links.csv
+- links_small.csv
 
-Путь пользовательского запроса от интерфейса до получения ответа с объяснениями.
+После скачивания разместите CSV-файлы в директории data.
 
-![Sequence Diagram](assets/sequence_diagram.png)
+## Архитектура
+
+Основная UML-диаграмма (единая):
+- docs/uml/system_overview.puml
+
+Рендеры диаграммы:
+- docs/uml/system_overview.svg
+- docs/uml/system_overview.pdf
+- docs/uml/system_overview.png
+
+![Unified System Diagram](docs/uml/system_overview.svg)
+
+Если в вашем просмотрщике PNG отображается некорректно, в README используется SVG-версия, а PDF доступен как резервный формат.
 
 ## Основные возможности
 
-*   **Мультиязычный поиск:** Возможность вводить запросы на русском языке (автоматический перевод через LLM).
-*   **Гибридный ранжирование:** Объединение результатов FAISS (схожесть векторов) и ALS (индивидуальные предпочтения) с настраиваемыми весами.
-*   **Объясняемость (Explainability):** LLM анализирует список рекомендованных фильмов и генерирует краткое пояснение, почему фильм подходит под запрос пользователя.
-*   **Мониторинг:** Сбор метрик производительности (Prometheus) и визуализация (Grafana).
+- Гибридные рекомендации: FAISS + ALS.
+- Персонализация по user_id.
+- LLM-объяснения в ответе API.
+- Интеграция с Open WebUI через tool/function.
+- Метрики и мониторинг в Prometheus/Grafana.
+- Трекинг параметров и latency в MLflow.
 
-## Стек технологий
+## Технологии
 
-*   **Язык:** Python 3.11
-*   **Web Framework:** FastAPI, Streamlit
-*   **ML & Data:** PyTorch (Sentence Transformers), FAISS, Implicit (ALS), Pandas, NumPy
-*   **LLM:** Llama-3-8b via Groq API
-*   **Database:** PostgreSQL
-*   **DevOps:** Docker, Docker Compose
-*   **Monitoring:** Prometheus, Grafana, MLflow
+- Python 3.11
+- FastAPI, SQLAlchemy, PostgreSQL
+- sentence-transformers, FAISS, implicit (ALS)
+- OpenAI-compatible LLM providers (Groq)
+- Docker, Docker Compose
+- Prometheus, Grafana, MLflow
 
 ## Структура проекта
 
-```text
 recsys_project/
-├── data/                   # Исходные и обработанные датасеты
-├── docs/uml/               # Исходники UML-диаграмм (.puml)
-├── frontend/               # Клиентское приложение (Streamlit)
-├── scripts/                # Скрипты миграции данных и утилиты
-├── src/                    # Исходный код бэкенда
-│   ├── api/                # Маршруты и схемы FastAPI
-│   ├── database/           # Модели и подключение к БД
-│   ├── services/           # Бизнес-логика (ML, LLM)
-│   ├── config.py           # Конфигурация приложения
-│   └── main.py             # Точка входа
-├── docker-compose.yml      # Оркестрация контейнеров
-└── requirements.txt        # Зависимости Python
-```
+|- src/                          # backend API и сервисы рекомендаций
+|- scripts/                      # миграция CSV в PostgreSQL
+|- docs/uml/                     # UML-код диаграмм (PlantUML)
+|- docs/openwebui/               # интеграция Open WebUI tool/function
+|- data/                         # CSV, FAISS index, артефакты маппингов
+|- grafana/                      # provisioning и dashboards
+|- prometheus/                   # конфиг Prometheus
+|- docker-compose.yml
+|- requirements.txt
 
-## Установка и запуск
+## Быстрый запуск
 
-### Предварительные требования
-*   Docker и Docker Compose
-*   Аккаунт Groq API (для получения API Key)
+1. Подготовьте .env в корне проекта:
 
-### Инструкция по запуску
+POSTGRES_USER=myuser
+POSTGRES_PASSWORD=mypassword
+POSTGRES_DB=movie_recsys
+OPENROUTER_API_KEY=your_key_optional
+GROQ_API_KEY=your_key_optional
+OPENAI_API_KEY=your_key_optional
 
-1.  **Настройка окружения**
-    Создайте файл `.env` в корне проекта на основе примера.
-    ```bash
-    POSTGRES_USER=myuser
-    POSTGRES_PASSWORD=mypassword
-    POSTGRES_DB=movie_recsys
-    GROQ_API_KEY=your_groq_api_key_here
-    ```
+2. Убедитесь, что CSV из Kaggle лежат в data.
 
-2.  **Запуск контейнеров**
-    Соберите и запустите сервисы в фоновом режиме.
-    ```bash
-    docker-compose up -d --build
-    ```
+3. Поднимите сервисы:
 
-3.  **Миграция данных**
-    Загрузите данные из CSV в базу данных PostgreSQL. (Выполняется единоразово)
-    ```bash
-    docker exec movie_backend python scripts/migrate_csv_to_sql.py
-    ```
+docker compose up -d --build
 
-4.  **Доступ к интерфейсам**
-    *   **Backend API (Swagger UI):** http://localhost:8000/docs
-    *   **Frontend (Streamlit):** http://localhost:8501
-    *   **Grafana:** http://localhost:3000
-    *   **Prometheus:** http://localhost:9090
+4. Выполните миграцию CSV в БД (один раз):
 
-## Разработка
+docker exec movie_backend python scripts/migrate_csv_to_sql.py
 
-Для локальной разработки без Docker установите зависимости:
-```bash
+5. Откройте сервисы:
+
+- Open WebUI: http://localhost:3000
+- FastAPI docs: http://localhost:8000/docs
+- Grafana: http://localhost:3001
+- Prometheus: http://localhost:9090
+- MLflow: http://localhost:5000
+
+## Open WebUI
+
+Файл для интеграции:
+- docs/openwebui/movie_recsys_tool.py
+
+Инструкция:
+- docs/openwebui/README.md
+
+## Мониторинг
+
+- Prometheus собирает метрики backend с endpoint /metrics.
+- Grafana загружает дашборды из grafana/dashboards.
+- MLflow хранит параметры и метрики запросов в эксперименте Movie_Recommendations.
+
+## Локальная разработка без Docker
+
 python -m venv .venv
-source .venv/bin/activate  # или .venv\Scripts\activate на Windows
+.venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn src.main:app --reload
-```

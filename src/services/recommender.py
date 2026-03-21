@@ -56,20 +56,63 @@ class RecommenderService:
         except:
             search_query = query
 
-        # Шаг 2: Получаем много кандидатов (30 штук)
-        candidates = await asyncio.to_thread(self._get_faiss_candidates, search_query, top_k=30)
+        # Шаг 2: Получаем расширенный пул кандидатов для более точной фильтрации
+        candidate_pool_size = max(40, top_k * 6)
+        candidates = await asyncio.to_thread(self._get_faiss_candidates, search_query, top_k=candidate_pool_size)
         return [c[0] for c in candidates]
 
-    async def get_explanation(self, movie_titles: List[str], query: str, user_history_str: str = "") -> str:
-        if not movie_titles: return json.dumps({"recommendations": []})
+    @staticmethod
+    def _keyword_fallback(movie_candidates: List[Dict[str, Any]], query: str, limit: int = 5) -> Dict[str, Any]:
+        stopwords = {
+            "и", "в", "на", "с", "по", "для", "про", "где", "что", "как", "или", "а", "но",
+            "the", "and", "with", "for", "from", "about", "that", "this", "movie", "film",
+        }
+        tokens = [t.lower() for t in re.findall(r"[A-Za-zА-Яа-я0-9]+", query) if len(t) >= 3]
+        tokens = [t for t in tokens if t not in stopwords]
+
+        scored = []
+        for movie in movie_candidates:
+            haystack = " ".join([
+                str(movie.get("title", "")),
+                str(movie.get("overview", "")),
+                str(movie.get("genres", "")),
+            ]).lower()
+            score = sum(1 for t in tokens if t in haystack)
+            if score > 0:
+                scored.append((score, movie))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        recs = []
+        for _, movie in scored[:limit]:
+            recs.append({
+                "title": movie.get("title", "Untitled"),
+                "description": (movie.get("overview") or "Описание отсутствует")[:400],
+                "reason": "Совпадение по ключевым словам запроса в описании/жанрах.",
+            })
+
+        return {"recommendations": recs}
+
+    async def get_explanation(self, movie_candidates: List[Dict[str, Any]], query: str, user_history_str: str = "") -> str:
+        if not movie_candidates:
+            return json.dumps({"recommendations": []}, ensure_ascii=False)
+
+        compact_candidates = [
+            {
+                "title": m.get("title", ""),
+                "overview": (m.get("overview") or "")[:600],
+                "genres": m.get("genres", ""),
+            }
+            for m in movie_candidates[:30]
+        ]
+        candidates_json = json.dumps(compact_candidates, ensure_ascii=False)
         
-        # Шаг 3: Жесткий фильтр (Reranker)
         prompt = f"""Запрос пользователя: "{query}".
-Список кандидатов от алгоритма: [{', '.join(movie_titles)}].
+История пользователя (если есть): "{user_history_str}".
+Список кандидатов от алгоритма (title + overview + genres): {candidates_json}
 
 Твоя задача:
-1. Выбери из списка ТОЛЬКО те фильмы, которые РЕАЛЬНО подходят под запрос.
-2. Если фильм не подходит (даже отдаленно) — ВЫБРОСЬ ЕГО. Не пытайся его оправдать.
+1. Выбери из списка ТОЛЬКО те фильмы, которые действительно подходят под запрос.
+2. Оценивай по смыслу overview и жанрам, а не только по title.
 3. Оставь максимум 5 лучших совпадений.
 4. Если ни один фильм не подходит, верни пустой список.
 
@@ -86,9 +129,14 @@ class RecommenderService:
                 )
                 content = response.choices[0].message.content
                 match = re.search(r'\{.*\}', content, re.DOTALL)
-                if match: return match.group(0)
+                if match:
+                    parsed = json.loads(match.group(0))
+                    if parsed.get("recommendations"):
+                        return json.dumps(parsed, ensure_ascii=False)
             except:
                 continue
-        return json.dumps({"recommendations": []})
+
+        fallback = self._keyword_fallback(movie_candidates, query, limit=5)
+        return json.dumps(fallback, ensure_ascii=False)
 
 recommender_service = RecommenderService()

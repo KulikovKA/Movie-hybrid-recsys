@@ -132,8 +132,7 @@ async def migrate_ratings(session: AsyncSession):
         if chunk.empty:
             continue
         
-        # Вставляем данные. if_exists='append' добавит строки.
-        # index=False, чтобы не писать индекс pandas как колонку.
+ 
         try:
             chunk.to_sql('ratings', con=engine, if_exists='append', index=False, method='multi', chunksize=1000)
             total_loaded += len(chunk)
@@ -164,6 +163,5 @@ async def main():
             await session.rollback()
 
 if __name__ == "__main__":
-    # Это обязательный блок для запуска скрипта из терминала
     asyncio.run(main())
     
